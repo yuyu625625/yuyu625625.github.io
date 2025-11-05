@@ -77,11 +77,10 @@
                 statusElem.textContent = '连接断开，重试中...';
                 statusElem.style.color = 'orange';
                 setTimeout(connectWebSocket, 3000);
-            };
 
             // 暴露到全局供其他脚本使用
             window.socket = socket;
-        }
+        };
 
         // 页面加载时初始化
         window.onload = () => {
