@@ -36,6 +36,35 @@
                 }
             }
         }
+        // 连接 Vercel 部署的 WebSocket 服务（替换为你的域名）
+  const socket = new WebSocket('wss://vercel-ws-server.vercel.app');
+
+  // 连接成功
+  socket.onopen = () => {
+    console.log('网页已连接到 Vercel 服务器');
+    document.getElementById('status').textContent = '已连接';
+  };
+
+  // 接收消息（来自小程序）
+  socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.type === 'miniProgramMsg') {
+      document.getElementById('miniMsg').textContent = `小程序：${data.content}`;
+    }
+  };
+
+  // 发送消息到小程序（点击按钮触发）
+  document.getElementById('sendBtn').addEventListener('click', () => {
+    const content = document.getElementById('webInput').value;
+    if (content && socket.readyState === 1) {
+      socket.send(JSON.stringify({
+        type: 'webMsg',
+        content: content
+      }));
+      document.getElementById('webInput').value = '';
+    }
+  });
+
     </script>
     <style type="text/tailwindcss">
         @layer utilities {
@@ -335,6 +364,13 @@
             </div>
         </div>
     </div>
+        <div>
+          <p>连接状态：<span id="status">未连接</span></p >
+          <input id="webInput" placeholder="输入要发送给小程序的内容" />
+          <button id="sendBtn">发送到小程序</button>
+          <p>小程序消息：<span id="miniMsg"></span></p >
+        </div>
+    
 
     <!-- JavaScript -->
     <script>
