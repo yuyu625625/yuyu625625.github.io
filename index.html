@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能语音识别系统</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- 统一的 Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa',
+                        light: '#dbeafe',
+                        dark: '#1e3a8a'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'wave': 'wave 1.5s infinite',
+                    },
+                    keyframes: {
+                        wave: {
+                            '0%, 100%': { transform: 'scaleY(0.5)' },
+                            '50%': { transform: 'scaleY(1.0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .bg-gradient-blue {
+                background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            }
+            .device-card {
+                @apply bg-white rounded-xl shadow-lg p-6 transition-all duration-300 hover:shadow-xl;
+            }
+            .device-card-active {
+                @apply ring-2 ring-accent;
+            }
+            .btn-primary {
+                @apply bg-primary hover:bg-dark text-white font-bold py-3 px-6 rounded-full transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50;
+            }
+            .btn-secondary {
+                @apply bg-light hover:bg-accent text-primary font-bold py-3 px-6 rounded-full transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50;
+            }
+            .audio-wave {
+                @apply flex items-center justify-center h-16 gap-1;
+            }
+            .audio-wave-bar {
+                @apply w-1 bg-accent rounded-full animate-wave;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 背景图 -->
+    <div class="fixed inset-0 z-0 opacity-10 pointer-events-none">
+        <img src="https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/88ffa515f3c8497cb772a835eaa860aa~tplv-a9rns2rl98-image.image?rcl=20251104185226B9F34BA0D416B80C1A9B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1764845571&x-signature=DPZp5fJtbHbFmHKgWU83v%2FHkvG0%3D" 
+             alt="背景" class="w-full h-full object-cover">
+    </div>
+
+    <!-- 顶部导航栏 -->
+    <nav class="bg-white shadow-md relative z-10">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-microphone text-primary text-2xl"></i>
+                <h1 class="text-xl font-bold text-primary">智能语音识别系统</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button id="historyBtn" class="text-gray-600 hover:text-primary transition-colors">
+                    <i class="fa fa-history text-xl"></i>
+                </button>
+                <button id="settingsBtn" class="text-gray-600 hover:text-primary transition-colors">
+                    <i class="fa fa-cog text-xl"></i>
+                </button>
+                <div class="relative">
+                    <button id="deviceBtn" class="text-gray-600 hover:text-primary transition-colors">
+                        <i class="fa fa-mobile text-xl md:text-2xl"></i>
+                    </button>
+                    <div id="deviceDropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 hidden">
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="switchDevice('pc')">
+                            <i class="fa fa-desktop mr-2"></i>PC端
+                        </a>
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="switchDevice('ios')">
+                            <i class="fa fa-apple mr-2"></i>iOS端
+                        </a>
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="switchDevice('android')">
+                            <i class="fa fa-android mr-2"></i>Android端
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-8 relative z-10">
+        <!-- 语音识别区域 -->
+        <section class="bg-white rounded-2xl shadow-lg p-6 mb-8">
+            <div class="flex flex-col items-center justify-center">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">语音识别</h2>
+                
+                <!-- 语音波形动画 -->
+                <div id="audioWave" class="audio-wave mb-8 hidden">
+                    <div class="audio-wave-bar h-4"></div>
+                    <div class="audio-wave-bar h-8"></div>
+                    <div class="audio-wave-bar h-12"></div>
+                    <div class="audio-wave-bar h-6"></div>
+                    <div class="audio-wave-bar h-10"></div>
+                    <div class="audio-wave-bar h-4"></div>
+                    <div class="audio-wave-bar h-8"></div>
+                    <div class="audio-wave-bar h-12"></div>
+                    <div class="audio-wave-bar h-6"></div>
+                    <div class="audio-wave-bar h-10"></div>
+                    <div class="audio-wave-bar h-4"></div>
+                    <div class="audio-wave-bar h-8"></div>
+                    <div class="audio-wave-bar h-12"></div>
+                    <div class="audio-wave-bar h-6"></div>
+                    <div class="audio-wave-bar h-10"></div>
+                </div>
+                
+                <!-- 麦克风按钮 -->
+                <button id="micBtn" class="btn-primary flex items-center justify-center space-x-2 mb-8">
+                    <i class="fa fa-microphone text-2xl"></i>
+                    <span>开始语音识别</span>
+                </button>
+                
+                <!-- 识别状态 -->
+                <div id="status" class="text-gray-600 mb-6 text-center">
+                    点击上方按钮开始语音识别
+                </div>
+                
+                <!-- 识别结果 -->
+                <div class="w-full max-w-2xl">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">识别结果:</h3>
+                    <div id="result" class="min-h-[100px] p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <p class="text-gray-500 italic">识别结果将显示在这里...</p>
+                    </div>
+                </div>
+                
+                <!-- 关键词提取 -->
+                <div class="w-full max-w-2xl mt-6">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">关键词提取:</h3>
+                    <div id="keywords" class="min-h-[60px] p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <p class="text-gray-500 italic">关键词将显示在这里...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 设备联动区域 -->
+        <section class="mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">设备联动</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- 智能控制 -->
+                <div id="controlDevice" class="device-card">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-800">智能控制</h3>
+                            <p class="text-gray-500 text-sm">控制中心</p>
+                        </div>
+                        <img src="https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/20343ff479a4447aabb6d873bcc8b7c1~tplv-a9rns2rl98-image.image?rcl=20251104185226B9F34BA0D416B80C1A9B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1764845571&x-signature=Rdseuy856HHnqXHIEHkaoPMsFkU%3D" 
+                             alt="智能控制" class="w-12 h-12">
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span id="controlStatus" class="text-gray-600">待机</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="controlToggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- 智能灯光 -->
+                <div id="lightDevice" class="device-card">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-800">智能灯光</h3>
+                            <p class="text-gray-500 text-sm">客厅灯光</p>
+                        </div>
+                        <img src="https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/8d0cf06a3e7049c684cbdfd4bc411732~tplv-a9rns2rl98-image.image?rcl=20251104185226B9F34BA0D416B80C1A9B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1764845571&x-signature=phyGLoLuwoHA2KaXQLi0JprXK1w%3D" 
+                             alt="智能灯光" class="w-12 h-12">
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span id="lightStatus" class="text-gray-600">关闭</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="lightToggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- 智能窗帘 -->
+                <div id="curtainDevice" class="device-card">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-800">智能窗帘</h3>
+                            <p class="text-gray-500 text-sm">卧室窗帘</p>
+                        </div>
+                        <img src="https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/f4ad65d6d0374967add2a9ca05418114~tplv-a9rns2rl98-image.image?rcl=20251104185226B9F34BA0D416B80C1A9B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1764845571&x-signature=aJODDdc4f0lPmrmZxlOurxXH0Ws%3D" 
+                             alt="智能窗帘" class="w-12 h-12">
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span id="curtainStatus" class="text-gray-600">关闭</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="curtainToggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 语音指令示例 -->
+        <section class="bg-white rounded-2xl shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">语音指令示例</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <p class="text-primary font-medium">"打开灯光"</p>
+                    <p class="text-gray-600 text-sm">控制客厅灯光开启</p>
+                </div>
+                <div class="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <p class="text-primary font-medium">"关闭灯光"</p>
+                    <p class="text-gray-600 text-sm">控制客厅灯光关闭</p>
+                </div>
+                <div class="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <p class="text-primary font-medium">"打开窗帘"</p>
+                    <p class="text-gray-600 text-sm">控制卧室窗帘打开</p>
+                </div>
+                <div class="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <p class="text-primary font-medium">"关闭窗帘"</p>
+                    <p class="text-gray-600 text-sm">控制卧室窗帘关闭</p>
+                </div>
+                <div class="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <p class="text-primary font-medium">"开启智能控制"</p>
+                    <p class="text-gray-600 text-sm">启动智能控制中心</p>
+                </div>
+                <div class="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <p class="text-primary font-medium">"关闭智能控制"</p>
+                    <p class="text-gray-600 text-sm">关闭智能控制中心</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 底部信息 -->
+    <footer class="bg-white shadow-inner py-6 mt-8 relative z-10">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-gray-600">© 2025 智能语音识别系统 | 多平台物联网应用</p>
+            <div class="flex justify-center space-x-4 mt-4">
+                <a href="#" class="text-gray-500 hover:text-primary transition-colors">
+                    <i class="fa fa-question-circle"></i> 帮助
+                </a>
+                <a href="#" class="text-gray-500 hover:text-primary transition-colors">
+                    <i class="fa fa-info-circle"></i> 关于
+                </a>
+                <a href="#" class="text-gray-500 hover:text-primary transition-colors">
+                    <i class="fa fa-envelope"></i> 联系我们
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 历史记录模态框 -->
+    <div id="historyModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-xl shadow-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">识别历史记录</h2>
+                <button id="closeHistoryBtn" class="text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            <div id="historyList" class="space-y-4">
+                <!-- 历史记录将在这里动态添加 -->
+                <p class="text-gray-500 italic text-center">暂无历史记录</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置模态框 -->
+    <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">系统设置</h2>
+                <button id="closeSettingsBtn" class="text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2">语音识别语言</label>
+                    <select id="languageSelect" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="zh-CN">中文 (简体)</option>
+                        <option value="en-US">English (US)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2">连续识别模式</label>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="continuousMode" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2">关键词提取</label>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="keywordExtraction" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2">保存历史记录</label>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="saveHistory" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                </div>
+                <button id="saveSettingsBtn" class="btn-primary w-full">保存设置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // 全局变量
+        let recognition = null;
+        let isRecording = false;
+        let historyRecords = JSON.parse(localStorage.getItem('voiceHistory')) || [];
+        let currentDevice = 'pc'; // 默认设备
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化语音识别
+            initSpeechRecognition();
+            
+            // 绑定事件
+            document.getElementById('micBtn').addEventListener('click', toggleSpeechRecognition);
+            document.getElementById('historyBtn').addEventListener('click', showHistoryModal);
+            document.getElementById('closeHistoryBtn').addEventListener('click', hideHistoryModal);
+            document.getElementById('settingsBtn').addEventListener('click', showSettingsModal);
+            document.getElementById('closeSettingsBtn').addEventListener('click', hideSettingsModal);
+            document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+            document.getElementById('deviceBtn').addEventListener('click', toggleDeviceDropdown);
+            
+            // 设备控制切换
+            document.getElementById('lightToggle').addEventListener('change', toggleLight);
+            document.getElementById('curtainToggle').addEventListener('change', toggleCurtain);
+            document.getElementById('controlToggle').addEventListener('change', toggleControl);
+            
+            // 加载历史记录
+            loadHistory();
+            
+            // 加载设置
+            loadSettings();
+        });
+        
+        // 初始化语音识别
+        function initSpeechRecognition() {
+            // 检查浏览器是否支持语音识别
+            if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                
+                // 默认设置
+                recognition.lang = 'zh-CN';
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                
+                // 识别结果处理
+                recognition.onresult = handleRecognitionResult;
+                
+                // 识别结束处理
+                recognition.onend = handleRecognitionEnd;
+                
+                // 识别错误处理
+                recognition.onerror = handleRecognitionError;
+            } else {
+                document.getElementById('status').textContent = '您的浏览器不支持语音识别功能，请使用Chrome浏览器。';
+                document.getElementById('micBtn').disabled = true;
+            }
+        }
+        
+        // 处理识别结果
+        function handleRecognitionResult(event) {
+            let interimTranscript = '';
+            let finalTranscript = '';
+            
+            // 遍历识别结果
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+            
+            // 更新显示
+            const resultElement = document.getElementById('result');
+            if (finalTranscript) {
+                resultElement.innerHTML = `<p class="text-gray-800">${finalTranscript}</p>`;
+                
+                // 提取关键词
+                if (document.getElementById('keywordExtraction').checked) {
+                    extractKeywords(finalTranscript);
+                }
+                
+                // 处理设备控制指令
+                processDeviceCommand(finalTranscript);
+                
+                // 保存历史记录
+                if (document.getElementById('saveHistory').checked) {
+                    saveToHistory(finalTranscript);
+                }
+            } else if (interimTranscript) {
+                resultElement.innerHTML = `<p class="text-gray-600">${interimTranscript}</p>`;
+            }
+        }
+        
+        // 处理识别结束
+        function handleRecognitionEnd() {
+            isRecording = false;
+            document.getElementById('micBtn').innerHTML = '<i class="fa fa-microphone text-2xl"></i><span>开始语音识别</span>';
+            document.getElementById('micBtn').classList.remove('bg-red-600', 'hover:bg-red-700');
+            document.getElementById('micBtn').classList.add('bg-primary', 'hover:bg-dark');
+            document.getElementById('audioWave').classList.add('hidden');
+            document.getElementById('status').textContent = '语音识别已结束';
+            
+            // 如果是连续模式，重新开始识别
+            if (recognition.continuous && document.getElementById('continuousMode').checked) {
+                startSpeechRecognition();
+            }
+        }
+        
+        // 处理识别错误
+        function handleRecognitionError(event) {
+            console.error('语音识别错误:', event.error);
+            document.getElementById('status').textContent = `识别错误: ${event.error}`;
+            
+            // 停止识别
+            stopSpeechRecognition();
+        }
+        
+        // 开始语音识别
+        function startSpeechRecognition() {
+            if (recognition) {
+                try {
+                    recognition.start();
+                    isRecording = true;
+                    document.getElementById('micBtn').innerHTML = '<i class="fa fa-stop text-2xl"></i><span>停止语音识别</span>';
+                    document.getElementById('micBtn').classList.remove('bg-primary', 'hover:bg-dark');
+                    document.getElementById('micBtn').classList.add('bg-red-600', 'hover:bg-red-700');
+                    document.getElementById('audioWave').classList.remove('hidden');
+                    document.getElementById('status').textContent = '正在聆听...';
+                } catch (error) {
+                    console.error('启动语音识别失败:', error);
+                }
+            }
+        }
+        
+        // 停止语音识别
+        function stopSpeechRecognition() {
+            if (recognition && isRecording) {
+                recognition.stop();
+                isRecording = false;
+                document.getElementById('micBtn').innerHTML = '<i class="fa fa-microphone text-2xl"></i><span>开始语音识别</span>';
+                document.getElementById('micBtn').classList.remove('bg-red-600', 'hover:bg-red-700');
+                document.getElementById('micBtn').classList.add('bg-primary', 'hover:bg-dark');
+                document.getElementById('audioWave').classList.add('hidden');
+                document.getElementById('status').textContent = '语音识别已停止';
+            }
+        }
+        
+        // 切换语音识别状态
+        function toggleSpeechRecognition() {
+            if (isRecording) {
+                stopSpeechRecognition();
+            } else {
+                startSpeechRecognition();
+            }
+        }
+        
+        // 提取关键词
+        function extractKeywords(text) {
+            // 简单的关键词提取逻辑
+            const keywords = [];
+            
+            // 设备关键词
+            const deviceKeywords = ['灯光', '窗帘', '控制'];
+            // 动作关键词
+            const actionKeywords = ['打开', '关闭', '开启', '停止'];
+            
+            // 检查文本中是否包含关键词
+            deviceKeywords.forEach(keyword => {
+                if (text.includes(keyword)) {
+                    keywords.push(keyword);
+                }
+            });
+            
+            actionKeywords.forEach(keyword => {
+                if (text.includes(keyword)) {
+                    keywords.push(keyword);
+                }
+            });
+            
+            // 更新关键词显示
+            const keywordsElement = document.getElementById('keywords');
+            if (keywords.length > 0) {
+                keywordsElement.innerHTML = `<div class="flex flex-wrap gap-2">${keywords.map(keyword => 
+                    `<span class="px-3 py-1 bg-blue-100 text-primary rounded-full text-sm">${keyword}</span>`
+                ).join('')}</div>`;
+            } else {
+                keywordsElement.innerHTML = '<p class="text-gray-500 italic">未提取到关键词</p>';
+            }
+        }
+        
+        // 处理设备控制指令
+        function processDeviceCommand(text) {
+            // 灯光控制
+            if (text.includes('灯光')) {
+                const lightToggle = document.getElementById('lightToggle');
+                if (text.includes('打开') || text.includes('开启')) {
+                    lightToggle.checked = true;
+                    toggleLight();
+                } else if (text.includes('关闭') || text.includes('停止')) {
+                    lightToggle.checked = false;
+                    toggleLight();
+                }
+            }
+            
+            // 窗帘控制
+            if (text.includes('窗帘')) {
+                const curtainToggle = document.getElementById('curtainToggle');
+                if (text.includes('打开') || text.includes('开启')) {
+                    curtainToggle.checked = true;
+                    toggleCurtain();
+                } else if (text.includes('关闭') || text.includes('停止')) {
+                    curtainToggle.checked = false;
+                    toggleCurtain();
+                }
+            }
+            
+            // 智能控制
+            if (text.includes('智能控制') || text.includes('控制中心')) {
+                const controlToggle = document.getElementById('controlToggle');
+                if (text.includes('打开') || text.includes('开启')) {
+                    controlToggle.checked = true;
+                    toggleControl();
+                } else if (text.includes('关闭') || text.includes('停止')) {
+                    controlToggle.checked = false;
+                    toggleControl();
+                }
+            }
+        }
+        
+        // 切换灯光状态
+        function toggleLight() {
+            const lightToggle = document.getElementById('lightToggle');
+            const lightStatus = document.getElementById('lightStatus');
+            const lightDevice = document.getElementById('lightDevice');
+            
+            if (lightToggle.checked) {
+                lightStatus.textContent = '开启';
+                lightStatus.classList.remove('text-gray-600');
+                lightStatus.classList.add('text-primary', 'font-medium');
+                lightDevice.classList.add('device-card-active');
+            } else {
+                lightStatus.textContent = '关闭';
+                lightStatus.classList.remove('text-primary', 'font-medium');
+                lightStatus.classList.add('text-gray-600');
+                lightDevice.classList.remove('device-card-active');
+            }
+        }
+        
+        // 切换窗帘状态
+        function toggleCurtain() {
+            const curtainToggle = document.getElementById('curtainToggle');
+            const curtainStatus = document.getElementById('curtainStatus');
+            const curtainDevice = document.getElementById('curtainDevice');
+            
+            if (curtainToggle.checked) {
+                curtainStatus.textContent = '打开';
+                curtainStatus.classList.remove('text-gray-600');
+                curtainStatus.classList.add('text-primary', 'font-medium');
+                curtainDevice.classList.add('device-card-active');
+            } else {
+                curtainStatus.textContent = '关闭';
+                curtainStatus.classList.remove('text-primary', 'font-medium');
+                curtainStatus.classList.add('text-gray-600');
+                curtainDevice.classList.remove('device-card-active');
+            }
+        }
+        
+        // 切换智能控制状态
+        function toggleControl() {
+            const controlToggle = document.getElementById('controlToggle');
+            const controlStatus = document.getElementById('controlStatus');
+            const controlDevice = document.getElementById('controlDevice');
+            
+            if (controlToggle.checked) {
+                controlStatus.textContent = '运行中';
+                controlStatus.classList.remove('text-gray-600');
+                controlStatus.classList.add('text-primary', 'font-medium');
+                controlDevice.classList.add('device-card-active');
+            } else {
+                controlStatus.textContent = '待机';
+                controlStatus.classList.remove('text-primary', 'font-medium');
+                controlStatus.classList.add('text-gray-600');
+                controlDevice.classList.remove('device-card-active');
+            }
+        }
+        
+        // 保存到历史记录
+        function saveToHistory(text) {
+            const now = new Date();
+            const record = {
+                id: Date.now(),
+                text: text,
+                timestamp: now.toLocaleString()
+            };
+            
+            historyRecords.unshift(record); // 添加到开头
+            
+            // 限制历史记录数量
+            if (historyRecords.length > 20) {
+                historyRecords.pop();
+            }
+            
+            // 保存到本地存储
+            localStorage.setItem('voiceHistory', JSON.stringify(historyRecords));
+            
+            // 更新历史记录显示
+            loadHistory();
+        }
+        
+        // 加载历史记录
+        function loadHistory() {
+            const historyList = document.getElementById('historyList');
+            
+            if (historyRecords.length === 0) {
+                historyList.innerHTML = '<p class="text-gray-500 italic text-center">暂无历史记录</p>';
+                return;
+            }
+            
+            historyList.innerHTML = historyRecords.map(record => `
+                <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <p class="text-gray-800">${record.text}</p>
+                    <p class="text-gray-500 text-xs mt-1">${record.timestamp}</p>
+                </div>
+            `).join('');
+        }
+        
+        // 显示历史记录模态框
+        function showHistoryModal() {
+            document.getElementById('historyModal').classList.remove('hidden');
+        }
+        
+        // 隐藏历史记录模态框
+        function hideHistoryModal() {
+            document.getElementById('historyModal').classList.add('hidden');
+        }
+        
+        // 显示设置模态框
+        function showSettingsModal() {
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+        
+        // 隐藏设置模态框
+        function hideSettingsModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+        
+        // 加载设置
+        function loadSettings() {
+            const language = localStorage.getItem('recognitionLanguage') || 'zh-CN';
+            const continuousMode = localStorage.getItem('continuousMode') === 'true';
+            const keywordExtraction = localStorage.getItem('keywordExtraction') !== 'false';
+            const saveHistory = localStorage.getItem('saveHistory') !== 'false';
+            
+            document.getElementById('languageSelect').value = language;
+            document.getElementById('continuousMode').checked = continuousMode;
+            document.getElementById('keywordExtraction').checked = keywordExtraction;
+            document.getElementById('saveHistory').checked = saveHistory;
+            
+            // 更新语音识别设置
+            if (recognition) {
+                recognition.lang = language;
+                recognition.continuous = continuousMode;
+            }
+        }
+        
+        // 保存设置
+        function saveSettings() {
+            const language = document.getElementById('languageSelect').value;
+            const continuousMode = document.getElementById('continuousMode').checked;
+            const keywordExtraction = document.getElementById('keywordExtraction').checked;
+            const saveHistory = document.getElementById('saveHistory').checked;
+            
+            localStorage.setItem('recognitionLanguage', language);
+            localStorage.setItem('continuousMode', continuousMode);
+            localStorage.setItem('keywordExtraction', keywordExtraction);
+            localStorage.setItem('saveHistory', saveHistory);
+            
+            // 更新语音识别设置
+            if (recognition) {
+                recognition.lang = language;
+                recognition.continuous = continuousMode;
+            }
+            
+            // 关闭模态框
+            hideSettingsModal();
+            
+            // 显示保存成功提示
+            alert('设置已保存');
+        }
+        
+        // 切换设备下拉菜单
+        function toggleDeviceDropdown() {
+            const dropdown = document.getElementById('deviceDropdown');
+            dropdown.classList.toggle('hidden');
+        }
+        
+        // 切换设备
+        function switchDevice(device) {
+            currentDevice = device;
+            document.getElementById('deviceDropdown').classList.add('hidden');
+            
+            // 更新设备图标
+            const deviceBtn = document.getElementById('deviceBtn');
+            switch (device) {
+                case 'pc':
+                    deviceBtn.innerHTML = '<i class="fa fa-desktop text-xl md:text-2xl"></i>';
+                    break;
+                case 'ios':
+                    deviceBtn.innerHTML = '<i class="fa fa-apple text-xl md:text-2xl"></i>';
+                    break;
+                case 'android':
+                    deviceBtn.innerHTML = '<i class="fa fa-android text-xl md:text-2xl"></i>';
+                    break;
+            }
+            
+            // 显示设备切换提示
+            let deviceName = '';
+            switch (device) {
+                case 'pc': deviceName = 'PC端'; break;
+                case 'ios': deviceName = 'iOS端'; break;
+                case 'android': deviceName = 'Android端'; break;
+            }
+            
+            alert(`已切换到${deviceName}模式`);
+        }
+        
+        // 点击其他地方关闭下拉菜单
+        document.addEventListener('click', (event) => {
+            const deviceBtn = document.getElementById('deviceBtn');
+            const deviceDropdown = document.getElementById('deviceDropdown');
+            
+            if (!deviceBtn.contains(event.target) && !deviceDropdown.contains(event.target)) {
+                deviceDropdown.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
